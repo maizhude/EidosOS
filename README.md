@@ -4,7 +4,7 @@
 ![Status](https://img.shields.io/badge/status-in%20progress-yellow)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![Language](https://img.shields.io/badge/language-C%20%2F%20Assembly-orange)
-![Platform](https://img.shields.io/badge/platform-x86-lightgrey)
+![Platform](https://img.shields.io/badge/platform-ARM-lightgrey)
 
 > 一个从零开始构建的实验性操作系统项目，用于探索计算机系统的“本质形态（Eidos）”。
 
