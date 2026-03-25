@@ -8,10 +8,10 @@
  * @date    2026-03-23
  *
  * @version history
-Version    | Date       | Author    | Description           
+Version             | Date          | Author        | Description           
 
-V1.0.0      2026-03-23    whx         Initial version
-
+V1.0.00             2026-03-23      whx             1、初始版本，能够通过任务主动Yield切换任务
+V1.0.01             2026-03-23      whx             1、增加系统滴答定时器，每秒触发一次任务切换
  
  * @note
  * 每次版本升级，请在此处追加记录：

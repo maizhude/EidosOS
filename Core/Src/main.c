@@ -120,14 +120,16 @@ int main(void)
   MX_GPIO_Init();
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
-  PrintVersion();
   //初始化关闭所有灯
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_SET);
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_SET);
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_SET);
+  NVIC_SetPriority(PendSV_IRQn, 0xFF);   // 最低
+  NVIC_SetPriority(SysTick_IRQn, 0xFE);  // 比它高一点
   task_init(&task1, task_func1, task1_stack, STACK_SIZE);
   task_init(&task2, task_func2, task2_stack, STACK_SIZE);
-
+  HAL_Delay(100);
+  PrintVersion(); // 打印版本信息
   currentTCB = &task1;
 
   prvPortStartFirstTask(); // 启动第一个任务

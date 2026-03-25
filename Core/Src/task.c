@@ -82,7 +82,6 @@ void vTaskSwitchContext()
     else
     {
         currentTCB = &task1;
-        printf("vTaskSwitchContext2\n");
     }
     return;
 }
@@ -91,10 +90,10 @@ void vTaskSwitchContext()
  * @brief 切换任务
  * 
  */
-void yield(void)
-{
-    SCB->ICSR |= (1 << 28); // 触发 PendSV
-}
+// void yield(void)
+// {
+//     SCB->ICSR |= (1 << 28); // 触发 PendSV
+// }
 
 void prvPortStartFirstTask( void )
 {
@@ -128,10 +127,9 @@ void task_func1() {
             HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_1);
             // HAL_Delay(500);
             count1 = 0;
-            yield(); // 手动切换
+            // yield(); // 手动切换
         }
-        HAL_Delay(5);
-        printf("Task1 running: %d\n", count1++); 
+        count1++;
     }
 }
 
@@ -144,21 +142,8 @@ void task_func2() {
             HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_0);
             // HAL_Delay(500);
             count2 = 0;
-            yield(); // 手动切换
+            // yield(); // 手动切换
         }
-        HAL_Delay(5);
-        printf("Task2 running: %d\n", count2++); 
+        count2++;
     }
 }
-
-// ====== 主函数 ======
-// int main() {
-//     task_init(&task1, task_func1, task1_stack, STACK_SIZE);
-//     task_init(&task2, task_func2, task2_stack, STACK_SIZE);
-
-//     currentTCB = &task1;
-
-//     prvPortStartFirstTask(); // 启动第一个任务
-
-//     while (1);
-// }
