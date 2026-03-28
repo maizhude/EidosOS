@@ -22,10 +22,10 @@ whx            2026.3.11    V1.0.0          create file
 
 uint32_t task1_stack[STACK_SIZE];
 uint32_t task2_stack[STACK_SIZE];
+uint32_t task3_stack[STACK_SIZE];
 TCB_t tasks[MAX_TASKS]; // 任务队列，最多10个任务
 uint8_t task_count;
 TCB_t * currentTCB = NULL; // 当前正在运行的任务
-TCB_t task1, task2;
 
 void error_func() {
     printf("error_func \r\n");
@@ -73,17 +73,30 @@ void task_init(TCB_t *tcb, void (*task)(void), uint32_t *stack, int size)
  */
 void vTaskSwitchContext()
 {
-    printf("vTaskSwitchContext\n"); 
-    if (currentTCB == &task1)
+    for(int i = 0; i < MAX_TASKS; i++)
     {
-        currentTCB = &task2;
-        printf("vTaskSwitchContext1\n");
-    } 
-    else
-    {
-        currentTCB = &task1;
+        if(currentTCB == &tasks[i])
+        {
+            continue; // 跳过当前任务
+        }
+        if (tasks[i].state == READY)
+        {
+            currentTCB = &tasks[i];
+            break;
+        }
     }
     return;
+}
+
+void task_delay(uint32_t ticks)
+{
+    if (currentTCB != NULL)
+    {
+        currentTCB->delay = ticks;
+        currentTCB->state = BLOCKED; // 设置为阻塞状态
+
+        SCB->ICSR |= SCB_ICSR_PENDSVSET_Msk; // 触发 PendSV 进行任务切换
+    }
 }
 
 /**
@@ -122,10 +135,11 @@ void task_func1() {
     static int count1 = 0;
     while(1)
     {
-        if (count1 == 500)
+        if (count1 == 5000)
         {
             HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_1);
-            // HAL_Delay(500);
+            // HAL_Delay(100);
+            task_delay(100);
             count1 = 0;
             // yield(); // 手动切换
         }
@@ -137,13 +151,22 @@ void task_func2() {
     static int count2 = 0;
     while(1)
     {
-        if (count2 == 500)
+        if (count2 == 5000)
         {
-            HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_0);
-            // HAL_Delay(500);
+            HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_5);
+            // HAL_Delay(100);
+            task_delay(100);
             count2 = 0;
             // yield(); // 手动切换
         }
         count2++;
+    }
+}
+
+void task_idle() {
+    while(1)
+    {
+        // 空闲任务可以进入低功耗模式
+        __WFI(); // 等待中断
     }
 }
