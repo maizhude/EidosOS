@@ -21,11 +21,7 @@ whx            2026.3.11    V1.0.0          create file
 
 /***************** 全局变量定义 *************************/
 
-uint32_t task1_stack[STACK_SIZE];
-uint32_t task2_stack[STACK_SIZE];
-uint32_t task3_stack[STACK_SIZE];
 TCB_t* tasks[MAX_TASKS]; // 任务队列，最多10个任务
-uint8_t task_count;
 TCB_t * currentTCB = NULL; // 当前正在运行的任务
 
 void error_func() {
@@ -86,7 +82,7 @@ int task_init(void (*func)(void *), int priority, void *const pvParameters, uint
         uint32_t *stack_top = (uint32_t *)stack_addr;
         newTask->sp = myInitialiseStack(stack_top, func, pvParameters);
         newTask->state = READY;
-        // newTask->priority = priority;
+        newTask->priority = priority;
         tasks[currentTaskNum] = newTask;
     }
     currentTaskNum++;
@@ -100,16 +96,27 @@ int task_init(void (*func)(void *), int priority, void *const pvParameters, uint
  */
 void vTaskSwitchContext()
 {
-    for(int i = 0; i < MAX_TASKS; i++)
+    int maxPriority = -1;
+    static uint16_t next = 0; // 用于记录下一个任务的索引
+    // 寻找就绪任务中最大优先级
+    for (int i = 0; i < MAX_TASKS; i++)
     {
-        if(tasks[i] == NULL || currentTCB == tasks[i])
+        if (tasks[i] && tasks[i]->state == READY)
         {
-            continue; // 跳过当前任务
+            if (maxPriority < tasks[i]->priority)
+            {
+                maxPriority = tasks[i]->priority;
+            }
         }
-        if (tasks[i]->state == READY)
+    }
+    // 同优先级流转
+    for (int i = 0; i < MAX_TASKS; i++)
+    {
+        next = (next + 1) % MAX_TASKS;
+        if (tasks[next] && tasks[next]->state == READY && maxPriority == tasks[next]->priority)
         {
-            currentTCB = tasks[i];
-            break;
+            currentTCB = tasks[next];
+            break; // 找到优先级最高且未完成的任务并跳出循环，以继续执行下一个任务
         }
     }
     return;
@@ -188,6 +195,22 @@ void task_func2() {
             // yield(); // 手动切换
         }
         count2++;
+    }
+}
+
+void task_func3() {
+    static int count3 = 0;
+    while(1)
+    {
+        if (count3 == 5000)
+        {
+            HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_0);
+            printf("Task 3: %d\n", count3);
+            task_delay(100);
+            count3 = 0;
+            // yield(); // 手动切换
+        }
+        count3++;
     }
 }
 

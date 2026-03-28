@@ -46,9 +46,6 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-extern uint32_t task1_stack[STACK_SIZE];
-extern uint32_t task2_stack[STACK_SIZE];
-extern uint32_t task3_stack[STACK_SIZE];
 extern TCB_t * currentTCB; // 当前正在运行的任务
 extern TCB_t* tasks[MAX_TASKS];
 /* USER CODE END PV */
@@ -127,8 +124,9 @@ int main(void)
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_SET);
   NVIC_SetPriority(PendSV_IRQn, 0xFF);   // 最低
   NVIC_SetPriority(SysTick_IRQn, 0xFE);  // 比它高一点
-  task_init(task_func1, 0, NULL, STACK_SIZE);
-  task_init(task_func2, 0, NULL, STACK_SIZE);
+  task_init(task_func1, 2, NULL, STACK_SIZE);
+  task_init(task_func2, 3, NULL, STACK_SIZE);
+  task_init(task_func3, 4, NULL, STACK_SIZE);
   task_init(task_idle, 0, NULL, STACK_SIZE);
   HAL_Delay(100);
   PrintVersion(); // 打印版本信息
