@@ -59,7 +59,7 @@
 
 /* USER CODE BEGIN EV */
 extern TCB_t * currentTCB; // 当前正在运行的任务
-extern TCB_t tasks[MAX_TASKS];
+extern TCB_t* tasks[MAX_TASKS];
 /* USER CODE END EV */
 
 /******************************************************************************/
@@ -230,21 +230,24 @@ void SysTick_Handler(void)
   /* USER CODE BEGIN SysTick_IRQn 0 */
   for (int i = 0; i < MAX_TASKS; i++)
   {
-      if (tasks[i].state == BLOCKED)
+      if (NULL != tasks[i] && tasks[i]->state == BLOCKED)
       {
-          if (tasks[i].delay > 0)
+          if (tasks[i]->delay > 0)
           {
-              tasks[i].delay--;
+              tasks[i]->delay--;
 
-              if (tasks[i].delay == 0)
+              if (tasks[i]->delay == 0)
               {
-                  tasks[i].state = READY;
+                  tasks[i]->state = READY;
               }
           }
       }
   }
-  currentTCB->tick_count++;
-  if(currentTCB->tick_count == 1000)
+  if(currentTCB != NULL)
+  {
+    currentTCB->tick_count++;
+  }
+  if(currentTCB && currentTCB->tick_count >= 1000)
   {
     currentTCB->tick_count = 0;
     SCB->ICSR |= SCB_ICSR_PENDSVSET_Msk;

@@ -11,6 +11,7 @@ whx            2026.3.11    V1.0.0          create file
 
 #include <stdio.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include "task.h"
 #include "main.h"
 /**************** macros  *************************/
@@ -23,7 +24,7 @@ whx            2026.3.11    V1.0.0          create file
 uint32_t task1_stack[STACK_SIZE];
 uint32_t task2_stack[STACK_SIZE];
 uint32_t task3_stack[STACK_SIZE];
-TCB_t tasks[MAX_TASKS]; // 任务队列，最多10个任务
+TCB_t* tasks[MAX_TASKS]; // 任务队列，最多10个任务
 uint8_t task_count;
 TCB_t * currentTCB = NULL; // 当前正在运行的任务
 
@@ -31,20 +32,20 @@ void error_func() {
     printf("error_func \r\n");
     while(1);
 }
-uint32_t *init_stack(uint32_t *stack_top, void (*task)(void))
+uint32_t *myInitialiseStack(uint32_t *stack_top, void (*taskFunc)(void *), void *pvParameters)
 {
     uint32_t *sp = stack_top;
 
     // ===== 硬件自动恢复 =====
     *(--sp) = 0x01000000;        // xPSR（必须）
-    *(--sp) = (uint32_t)task;    // PC（任务入口）
+    *(--sp) = (uint32_t)taskFunc;          // PC（任务入口）
     *(--sp) = (uint32_t)error_func;        // LR（错误处理函数地址）
 
     *(--sp) = 0; // R12
     *(--sp) = 0; // R3
     *(--sp) = 0; // R2
     *(--sp) = 0; // R1
-    *(--sp) = 0; // R0
+    *(--sp) = (uint32_t)pvParameters; // R0
     *(--sp) = 0XFFFFFFFD; // EXC_RETURN（返回到Thread模式，使用PSP）
 
     // ===== 软件保存 =====
@@ -60,11 +61,37 @@ uint32_t *init_stack(uint32_t *stack_top, void (*task)(void))
     return sp;
 }
 
-void task_init(TCB_t *tcb, void (*task)(void), uint32_t *stack, int size)
+int task_init(void (*func)(void *), int priority, void *const pvParameters, uint32_t stackSize)
 {
-    uint32_t *stack_top = stack + size;
-
-    tcb->sp = init_stack(stack_top, task);
+    static int currentTaskNum;
+    if (currentTaskNum >= MAX_TASKS)
+    {
+        return -1;
+    }
+    TCB_t *newTask = malloc(sizeof(TCB_t));
+    if (newTask == NULL)
+    {
+        return -1;
+    }
+    
+    uint32_t *stack = malloc(stackSize);
+    if (stack == NULL)
+    {
+        free(newTask);
+        return -1;
+    }
+    else
+    {
+        uint32_t stack_addr = (uint32_t)stack + stackSize;
+        uint32_t *stack_top = (uint32_t *)stack_addr;
+        newTask->sp = myInitialiseStack(stack_top, func, pvParameters);
+        newTask->state = READY;
+        // newTask->priority = priority;
+        tasks[currentTaskNum] = newTask;
+    }
+    currentTaskNum++;
+    return 0;
+    
 }
 /**
  * @brief 选择下一个任务
@@ -75,13 +102,13 @@ void vTaskSwitchContext()
 {
     for(int i = 0; i < MAX_TASKS; i++)
     {
-        if(currentTCB == &tasks[i])
+        if(tasks[i] == NULL || currentTCB == tasks[i])
         {
             continue; // 跳过当前任务
         }
-        if (tasks[i].state == READY)
+        if (tasks[i]->state == READY)
         {
-            currentTCB = &tasks[i];
+            currentTCB = tasks[i];
             break;
         }
     }
@@ -139,6 +166,7 @@ void task_func1() {
         {
             HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_1);
             // HAL_Delay(100);
+            printf("Task 1: %d\n", count1);
             task_delay(100);
             count1 = 0;
             // yield(); // 手动切换
@@ -154,7 +182,7 @@ void task_func2() {
         if (count2 == 5000)
         {
             HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_5);
-            // HAL_Delay(100);
+            printf("Task 2: %d\n", count2);
             task_delay(100);
             count2 = 0;
             // yield(); // 手动切换

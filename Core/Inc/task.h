@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#define MAX_TASKS 3
+#define MAX_TASKS 10
 #define STACK_SIZE 512
 
 typedef enum { READY, RUNNING, BLOCKED } task_state_t;
@@ -18,7 +18,7 @@ typedef struct TCB
     task_state_t state;
 }TCB_t;
 
-void task_init(TCB_t *tcb, void (*task)(void), uint32_t *stack, int size);
+int task_init(void (*func)(void *), int priority, void *const pvParameters, uint32_t stackSize);
 void task_func1();
 void task_func2();
 void task_idle();
