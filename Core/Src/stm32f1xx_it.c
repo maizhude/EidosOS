@@ -239,6 +239,11 @@ void SysTick_Handler(void)
               if (tasks[i]->delay == 0)
               {
                   tasks[i]->state = READY;
+                  // 如果新就绪的任务优先级高于当前正在运行的任务，则触发 PendSV 进行任务切换
+                  if(tasks[i]->priority > currentTCB->priority)
+                  {
+                      SCB->ICSR |= SCB_ICSR_PENDSVSET_Msk; // 触发 PendSV 进行任务切换
+                  }
               }
           }
       }

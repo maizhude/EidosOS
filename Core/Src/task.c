@@ -174,7 +174,7 @@ void task_func1() {
             HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_1);
             // HAL_Delay(100);
             printf("Task 1: %d\n", count1);
-            task_delay(100);
+            task_delay(500);
             count1 = 0;
             // yield(); // 手动切换
         }
@@ -190,7 +190,7 @@ void task_func2() {
         {
             HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_5);
             printf("Task 2: %d\n", count2);
-            task_delay(100);
+            task_delay(500);
             count2 = 0;
             // yield(); // 手动切换
         }
