@@ -21,6 +21,8 @@
 #include "main.h"
 #include "task.h"
 #include "stm32f1xx_it.h"
+#include "list.h"
+#include <stdio.h>
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 /* USER CODE END Includes */
@@ -59,7 +61,9 @@
 
 /* USER CODE BEGIN EV */
 extern TCB_t * currentTCB; // 当前正在运行的任务
-extern TCB_t* tasks[MAX_TASKS];
+extern uint32_t currentTicks; // 系统滴答数
+extern vList delayList; // 任务延迟链表
+extern vList readyList; // 就绪链表
 /* USER CODE END EV */
 
 /******************************************************************************/
@@ -228,39 +232,49 @@ void PendSV_Handler(void)
 void SysTick_Handler(void)
 {
   /* USER CODE BEGIN SysTick_IRQn 0 */
-  for (int i = 0; i < MAX_TASKS; i++)
+  
+  /* USER CODE END SysTick_IRQn 0 */
+  HAL_IncTick();
+  /* USER CODE BEGIN SysTick_IRQn 1 */
+  currentTicks++; // 系统滴答数加1
+  // 超限清零
+  if (currentTicks == 0xFFFFFFFF)
   {
-      if (NULL != tasks[i] && tasks[i]->state == BLOCKED)
-      {
-          if (tasks[i]->delay > 0)
-          {
-              tasks[i]->delay--;
-
-              if (tasks[i]->delay == 0)
-              {
-                  tasks[i]->state = READY;
-                  // 如果新就绪的任务优先级高于当前正在运行的任务，则触发 PendSV 进行任务切换
-                  if(tasks[i]->priority > currentTCB->priority)
-                  {
-                      SCB->ICSR |= SCB_ICSR_PENDSVSET_Msk; // 触发 PendSV 进行任务切换
-                  }
-              }
-          }
-      }
+    currentTicks = 0;
   }
-  if(currentTCB != NULL)
+  if (currentTCB != NULL)
   {
     currentTCB->tick_count++;
   }
-  if(currentTCB && currentTCB->tick_count >= 1000)
+  // 时间片切换
+  if (currentTCB && currentTCB->tick_count >= 1000)
   {
     currentTCB->tick_count = 0;
     SCB->ICSR |= SCB_ICSR_PENDSVSET_Msk;
   }
-  /* USER CODE END SysTick_IRQn 0 */
-  HAL_IncTick();
-  /* USER CODE BEGIN SysTick_IRQn 1 */
-
+  // 根据delayList中的任务延迟时间，更新任务状态
+  ListItem_t *currentItem = delayList.end.next;
+  while (currentItem != &delayList.end)
+  {
+    ListItem_t *next = currentItem->next;
+    TCB_t *task = (TCB_t *)currentItem->pvOwner;
+    if (currentTicks == task->stateListItem.value)
+    {
+      task->state = READY;
+      // 从延迟链表中移除当前任务
+      vListRemove(&task->stateListItem);
+      // 设置优先级
+      task->stateListItem.value = task->priority;
+      // 插入就绪链表
+      vListInsert(&readyList, &task->stateListItem);
+      // 如果新就绪的任务优先级高于当前正在运行的任务，则触发 PendSV 进行任务切换
+      if (task->priority > currentTCB->priority)
+      {
+        SCB->ICSR |= SCB_ICSR_PENDSVSET_Msk; // 触发 PendSV 进行任务切换
+      }
+    }
+    currentItem = next;
+  }
   /* USER CODE END SysTick_IRQn 1 */
 }
 

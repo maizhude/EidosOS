@@ -23,6 +23,7 @@
 #include "task.h"
 #include <stdio.h>
 #include "version.h"
+#include "list.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
@@ -47,7 +48,10 @@
 
 /* USER CODE BEGIN PV */
 extern TCB_t * currentTCB; // 当前正在运行的任务
-extern TCB_t* tasks[MAX_TASKS];
+uint32_t currentTicks = 0; // 系统滴答数
+extern vList delayList;    // 任务延迟链表
+extern vList readyList;    // 就绪链表
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -124,35 +128,19 @@ int main(void)
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_SET);
   NVIC_SetPriority(PendSV_IRQn, 0xFF);   // 最低
   NVIC_SetPriority(SysTick_IRQn, 0xFE);  // 比它高一点
+  //初始化链表
+  vListInit(&delayList);
+  vListInit(&readyList);
   task_init(task_func1, 2, NULL, STACK_SIZE);
   task_init(task_func2, 3, NULL, STACK_SIZE);
   task_init(task_func3, 4, NULL, STACK_SIZE);
-  task_init(task_idle, 0, NULL, STACK_SIZE);
+  task_init(task_idle, 1, NULL, STACK_SIZE);
   HAL_Delay(100);
   PrintVersion(); // 打印版本信息
-  currentTCB = tasks[0];
+  currentTCB = readyList.end.next->next->pvOwner; // 设置当前任务为第一个就绪的任务
   prvPortStartFirstTask(); // 启动第一个任务
 
   while (1);
-  /* USER CODE END 2 */
-
-  /* Infinite loop */
-  /* USER CODE BEGIN WHILE */
-//   while (1)
-//   {
-//     //流水灯
-//     HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_0);
-//     HAL_Delay(500);
-//     HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_1);
-//     HAL_Delay(500);
-//     HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_5);
-//     HAL_Delay(500);
-//     /* USER CODE END WHILE */
-
-//     /* USER CODE BEGIN 3 */
-//   }
-//   /* USER CODE END 3 */
-// }
 }
 /**
   * @brief System Clock Configuration

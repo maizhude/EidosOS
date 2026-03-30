@@ -14,6 +14,7 @@ whx            2026.3.11    V1.0.0          create file
 #include <stdlib.h>
 #include "task.h"
 #include "main.h"
+#include "list.h"
 /**************** macros  *************************/
 
 
@@ -21,8 +22,10 @@ whx            2026.3.11    V1.0.0          create file
 
 /***************** 全局变量定义 *************************/
 
-TCB_t* tasks[MAX_TASKS]; // 任务队列，最多10个任务
 TCB_t * currentTCB = NULL; // 当前正在运行的任务
+extern uint32_t currentTicks; // 系统滴答数
+extern vList delayList; // 任务延迟链表
+extern vList readyList; // 就绪链表
 
 void error_func() {
     printf("error_func \r\n");
@@ -57,19 +60,26 @@ uint32_t *myInitialiseStack(uint32_t *stack_top, void (*taskFunc)(void *), void 
     return sp;
 }
 
+//初始化链表节点
+void taskListItemInit(TCB_t *task)
+{
+    vListItemInit(&task->stateListItem);
+    vListItemInit(&task->eventListItem);
+    task->stateListItem.pvOwner = task; // 设置节点所属任务
+    task->eventListItem.pvOwner = task; // 设置节点所属任务
+    task->stateListItem.value = task->priority; // 将优先级作为节点值，便于排序
+    task->eventListItem.value = 0; // 事件链表节点值暂
+}
+
 int task_init(void (*func)(void *), int priority, void *const pvParameters, uint32_t stackSize)
 {
-    static int currentTaskNum;
-    if (currentTaskNum >= MAX_TASKS)
-    {
-        return -1;
-    }
+    // 创建新的任务控制块
     TCB_t *newTask = malloc(sizeof(TCB_t));
     if (newTask == NULL)
     {
         return -1;
     }
-    
+    // 分配任务栈
     uint32_t *stack = malloc(stackSize);
     if (stack == NULL)
     {
@@ -80,12 +90,15 @@ int task_init(void (*func)(void *), int priority, void *const pvParameters, uint
     {
         uint32_t stack_addr = (uint32_t)stack + stackSize;
         uint32_t *stack_top = (uint32_t *)stack_addr;
+        // 初始化任务栈
         newTask->sp = myInitialiseStack(stack_top, func, pvParameters);
         newTask->state = READY;
         newTask->priority = priority;
-        tasks[currentTaskNum] = newTask;
+        // 初始化链表节点
+        taskListItemInit(newTask);
+        // 插入就绪链表
+        vListInsert(&readyList, &newTask->stateListItem);
     }
-    currentTaskNum++;
     return 0;
     
 }
@@ -96,51 +109,38 @@ int task_init(void (*func)(void *), int priority, void *const pvParameters, uint
  */
 void vTaskSwitchContext()
 {
-    int maxPriority = -1;
-    static uint16_t next = 0; // 用于记录下一个任务的索引
-    // 寻找就绪任务中最大优先级
-    for (int i = 0; i < MAX_TASKS; i++)
+    //根据链表头部选择优先级最高的就绪任务
+    if (readyList.itemNumber > 0)
     {
-        if (tasks[i] && tasks[i]->state == READY)
-        {
-            if (maxPriority < tasks[i]->priority)
-            {
-                maxPriority = tasks[i]->priority;
-            }
-        }
-    }
-    // 同优先级流转
-    for (int i = 0; i < MAX_TASKS; i++)
-    {
-        next = (next + 1) % MAX_TASKS;
-        if (tasks[next] && tasks[next]->state == READY && maxPriority == tasks[next]->priority)
-        {
-            currentTCB = tasks[next];
-            break; // 找到优先级最高且未完成的任务并跳出循环，以继续执行下一个任务
-        }
+        ListItem_t *nextItem = readyList.end.next; // 就绪链表头部节点
+        TCB_t *nextTask = (TCB_t *)nextItem->pvOwner; // 获取对应的任务控制块
+        currentTCB = nextTask; // 切换到下一个任务
     }
     return;
 }
 
 void task_delay(uint32_t ticks)
 {
-    if (currentTCB != NULL)
-    {
-        currentTCB->delay = ticks;
-        currentTCB->state = BLOCKED; // 设置为阻塞状态
-
-        SCB->ICSR |= SCB_ICSR_PENDSVSET_Msk; // 触发 PendSV 进行任务切换
-    }
+    // 设置任务状态为阻塞
+    currentTCB->state = BLOCKED;
+    // 从就绪链表中移除当前任务
+    vListRemove(&currentTCB->stateListItem);
+    // 设置节点的延时值为绝对时间，便于在延迟链表中排序
+    currentTCB->stateListItem.value = currentTicks + ticks;
+    // 插入延迟链表，按照剩余时间排序
+    vListInsert(&delayList, &currentTCB->stateListItem);
+    // 切换到下一个任务
+    taskYield();
 }
 
 /**
  * @brief 切换任务
  * 
  */
-// void yield(void)
-// {
-//     SCB->ICSR |= (1 << 28); // 触发 PendSV
-// }
+void taskYield(void)
+{
+    SCB->ICSR |= SCB_ICSR_PENDSVSET_Msk; // 触发 PendSV
+}
 
 void prvPortStartFirstTask( void )
 {
@@ -206,7 +206,7 @@ void task_func3() {
         {
             HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_0);
             printf("Task 3: %d\n", count3);
-            task_delay(100);
+            task_delay(200);
             count3 = 0;
             // yield(); // 手动切换
         }
