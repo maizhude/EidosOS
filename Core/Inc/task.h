@@ -42,6 +42,7 @@ void semaphoreSignal(Semaphore_t *sem);
 Semaphore_t *semaphoreInit(int initialCount);
 void semaphoreBinarySignal(Semaphore_t *sem);
 void semaphoreBinaryWait(Semaphore_t *sem);
+int semaphoreBinaryWaitTimeout(Semaphore_t *sem, uint32_t timeout);
 
 
 #endif /* __TASK_H */

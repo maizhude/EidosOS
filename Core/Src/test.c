@@ -40,7 +40,7 @@ void task_func2()
     static int count2 = 0;
     while (1)
     {
-        semaphoreBinaryWait(semKey);// 等待信号量
+        semaphoreBinaryWaitTimeout(semKey, 1000);// 等待信号量
         
         HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_5);
         printf("Task 2: %d\n", count2);

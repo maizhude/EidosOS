@@ -260,13 +260,19 @@ void SysTick_Handler(void)
     TCB_t *task = (TCB_t *)currentItem->pvOwner;
     if (currentTicks == task->stateListItem.value)
     {
+      __disable_irq(); // 进入临界区，禁止中断
       task->state = READY;
       // 从延迟链表中移除当前任务
       vListRemove(&task->stateListItem);
+      if(vListIsInList(&task->eventListItem)) // 如果任务事件节点还在信号量等待链表中，先移除
+      {
+          vListRemove(&task->eventListItem);
+      }
       // 设置优先级
       task->stateListItem.value = task->priority;
       // 插入就绪链表
-      vListInsert(&readyList, &task->stateListItem);
+      vListInsert(&readyList, &task->stateListItem, 0);
+      __enable_irq(); // 退出临界区，允许中断
       // 如果新就绪的任务优先级高于当前正在运行的任务，则触发 PendSV 进行任务切换
       if (task->priority > currentTCB->priority)
       {

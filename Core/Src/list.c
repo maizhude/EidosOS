@@ -58,13 +58,25 @@ void vListInsertEnd(vList *list, ListItem_t *node)
     list->itemNumber++;          // 链表元素数量加1
 }
 
-// 将节点按照值从大到小插入链表
-void vListInsert(vList *list, ListItem_t *node)
+// 将节点按照顺序插入链表，根据传入的顺序规则判断从大到小还是从小到大
+void vListInsert(vList *list, ListItem_t *node, int ascending)
 {
     ListItem_t *current = list->end.next; // 从头节点开始遍历
-    while (current != &list->end && current->value > node->value)
+    if (ascending)
     {
-        current = current->next; // 找到第一个值大于等于新节点的节点
+        // 从小到大插入
+        while (current != &list->end && current->value <= node->value)
+        {
+            current = current->next; // 找到第一个值大于新节点的节点
+        }
+    }
+    else
+    {
+        // 从大到小插入
+        while (current != &list->end && current->value >= node->value)
+        {
+            current = current->next; // 找到第一个值小于新节点的节点
+        }
     }
     // 将新节点插入到current之前
     node->prev = current->prev;
@@ -94,4 +106,9 @@ ListItem_t *vListGetHead(vList *list)
     return list->end.next; // 返回头节点（哨兵节点的后继）
 }
 
+//判断节点是否在链表中
+int vListIsInList(ListItem_t *node)
+{
+    return node->container != NULL; // 如果节点所属链表不为NULL，则说明在链表中
+}
 /***************************************************************/
