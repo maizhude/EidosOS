@@ -20,13 +20,14 @@
 #include "main.h"
 #include "usart.h"
 #include "gpio.h"
+
+/* Private includes ----------------------------------------------------------*/
+/* USER CODE BEGIN Includes */
 #include "task.h"
 #include <stdio.h>
 #include "version.h"
 #include "list.h"
-/* Private includes ----------------------------------------------------------*/
-/* USER CODE BEGIN Includes */
-
+#include "test.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -51,7 +52,7 @@ extern TCB_t * currentTCB; // 当前正在运行的任务
 uint32_t currentTicks = 0; // 系统滴答数
 extern vList delayList;    // 任务延迟链表
 extern vList readyList;    // 就绪链表
-
+Semaphore_t *semKey;        // 二值信号量
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -122,26 +123,37 @@ int main(void)
   MX_GPIO_Init();
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
-  //初始化关闭所有灯
+  // 初始化关闭所有灯
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_SET);
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_SET);
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_SET);
-  NVIC_SetPriority(PendSV_IRQn, 0xFF);   // 最低
-  NVIC_SetPriority(SysTick_IRQn, 0xFE);  // 比它高一点
-  //初始化链表
+  NVIC_SetPriority(PendSV_IRQn, 0xFF);  // 最低
+  NVIC_SetPriority(SysTick_IRQn, 0xFE); // 比它高一点
+  // 初始化链表
   vListInit(&delayList);
   vListInit(&readyList);
-  task_init(task_func1, 2, NULL, STACK_SIZE);
-  task_init(task_func2, 3, NULL, STACK_SIZE);
-  task_init(task_func3, 4, NULL, STACK_SIZE);
-  task_init(task_idle, 1, NULL, STACK_SIZE);
+  semKey = semaphoreBinaryInit(); // 初始化二值信号量
+  taskInit(task_func1, 2, NULL, STACK_SIZE);
+  taskInit(task_func2, 3, NULL, STACK_SIZE);
+  taskInit(task_func3, 4, NULL, STACK_SIZE);
+  taskInit(task_idle, 1, NULL, STACK_SIZE);
   HAL_Delay(100);
-  PrintVersion(); // 打印版本信息
+  PrintVersion();                                 // 打印版本信息
   currentTCB = readyList.end.next->next->pvOwner; // 设置当前任务为第一个就绪的任务
-  prvPortStartFirstTask(); // 启动第一个任务
+  prvPortStartFirstTask();                        // 启动第一个任务
+  /* USER CODE END 2 */
 
-  while (1);
+  /* Infinite loop */
+  /* USER CODE BEGIN WHILE */
+  while (1)
+  {
+    /* USER CODE END WHILE */
+
+    /* USER CODE BEGIN 3 */
+  }
+  /* USER CODE END 3 */
 }
+
 /**
   * @brief System Clock Configuration
   * @retval None

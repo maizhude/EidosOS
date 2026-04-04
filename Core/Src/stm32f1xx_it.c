@@ -19,12 +19,12 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "task.h"
 #include "stm32f1xx_it.h"
-#include "list.h"
-#include <stdio.h>
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "task.h"
+#include "list.h"
+#include <stdio.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -89,14 +89,14 @@ void NMI_Handler(void)
   */
 void HardFault_Handler(void)
 {
-    __asm volatile
-    (
-        "tst lr, #4            \n" // 判断使用 MSP 还是 PSP
-        "ite eq                \n"
-        "mrseq r0, msp         \n" // r0 = MSP
-        "mrsne r0, psp         \n" // r0 = PSP
-        "b hardfault_handler_c \n"
-    );
+  /* USER CODE BEGIN HardFault_IRQn 0 */
+
+  /* USER CODE END HardFault_IRQn 0 */
+  while (1)
+  {
+    /* USER CODE BEGIN W1_HardFault_IRQn 0 */
+    /* USER CODE END W1_HardFault_IRQn 0 */
+  }
 }
 
 /**

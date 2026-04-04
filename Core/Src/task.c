@@ -15,22 +15,53 @@ whx            2026.3.11    V1.0.0          create file
 #include "task.h"
 #include "main.h"
 #include "list.h"
-/**************** macros  *************************/
+/*********************** Macro Definitions ***********************/
 
 
-/***************************************************/
 
-/***************** 全局变量定义 *************************/
+/***************************************************************/
 
-TCB_t * currentTCB = NULL; // 当前正在运行的任务
+/*********************** Type Definitions ***********************/
+
+
+
+/***************************************************************/
+
+/*********************** Global Variables ***********************/
+
+TCB_t *currentTCB = NULL;     // 当前正在运行的任务
 extern uint32_t currentTicks; // 系统滴答数
-extern vList delayList; // 任务延迟链表
-extern vList readyList; // 就绪链表
+extern vList delayList;       // 任务延迟链表
+extern vList readyList;       // 就绪链表
 
-void error_func() {
-    printf("error_func \r\n");
+/***************************************************************/
+
+/*********************** Static Variables ***********************/
+
+
+
+/***************************************************************/
+
+/*********************** Function Prototypes ********************/
+
+
+/***************************************************************/
+
+/*********************** Function Implementations ***************/
+/**
+ * @brief 任务失败处理函数
+ */
+static void errorFunc() {
+    printf("errorFunc \r\n");
     while(1);
 }
+/**
+ * @brief 初始化任务栈
+ * @param stack_top 栈顶指针
+ * @param taskFunc 任务函数指针
+ * @param pvParameters 参数指针
+ * @return 栈顶指针
+ */
 uint32_t *myInitialiseStack(uint32_t *stack_top, void (*taskFunc)(void *), void *pvParameters)
 {
     uint32_t *sp = stack_top;
@@ -38,7 +69,7 @@ uint32_t *myInitialiseStack(uint32_t *stack_top, void (*taskFunc)(void *), void 
     // ===== 硬件自动恢复 =====
     *(--sp) = 0x01000000;        // xPSR（必须）
     *(--sp) = (uint32_t)taskFunc;          // PC（任务入口）
-    *(--sp) = (uint32_t)error_func;        // LR（错误处理函数地址）
+    *(--sp) = (uint32_t)errorFunc;         // LR（错误处理函数地址）
 
     *(--sp) = 0; // R12
     *(--sp) = 0; // R3
@@ -60,7 +91,10 @@ uint32_t *myInitialiseStack(uint32_t *stack_top, void (*taskFunc)(void *), void 
     return sp;
 }
 
-//初始化链表节点
+/**
+ * @brief 初始化任务链表节点
+ * @param task 任务控制块指针
+ */
 void taskListItemInit(TCB_t *task)
 {
     vListItemInit(&task->stateListItem);
@@ -71,7 +105,15 @@ void taskListItemInit(TCB_t *task)
     task->eventListItem.value = 0; // 事件链表节点值暂
 }
 
-int task_init(void (*func)(void *), int priority, void *const pvParameters, uint32_t stackSize)
+/**
+ * @brief 初始化任务
+ * @param func 任务函数指针
+ * @param priority 任务优先级
+ * @param pvParameters 参数指针
+ * @param stackSize 栈大小
+ * @return 初始化结果
+ */
+int taskInit(void (*func)(void *), int priority, void *const pvParameters, uint32_t stackSize)
 {
     // 创建新的任务控制块
     TCB_t *newTask = malloc(sizeof(TCB_t));
@@ -103,9 +145,8 @@ int task_init(void (*func)(void *), int priority, void *const pvParameters, uint
     
 }
 /**
- * @brief 选择下一个任务
+ * @brief 选择优先级最高的就绪任务进行切换
  * 
- * @return TCB_t* 
  */
 void vTaskSwitchContext()
 {
@@ -119,7 +160,11 @@ void vTaskSwitchContext()
     return;
 }
 
-void task_delay(uint32_t ticks)
+/**
+ * @brief 任务延迟函数
+ * @param ticks 延迟的系统滴答数
+ */
+void taskDelay(uint32_t ticks)
 {
     // 设置任务状态为阻塞
     currentTCB->state = BLOCKED;
@@ -142,6 +187,9 @@ void taskYield(void)
     SCB->ICSR |= SCB_ICSR_PENDSVSET_Msk; // 触发 PendSV
 }
 
+/**
+ * @brief 启动第一个任务
+ */
 void prvPortStartFirstTask( void )
 {
 	/* Start the first task.  This also clears the bit that indicates the FPU is
@@ -164,60 +212,132 @@ void prvPortStartFirstTask( void )
 				);
 }
 
-// ====== 示例任务 ======
-void task_func1() {
-    static int count1 = 0;
-    while(1)
+/**
+ * @brief 初始化信号量
+ * @param sem 信号量指针
+ * @param count 初始计数值
+ */
+Semaphore_t *semaphoreInit(int count)
+{
+    Semaphore_t *sem = malloc(sizeof(Semaphore_t));
+    if (sem == NULL)
     {
-        if (count1 == 5000)
-        {
-            HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_1);
-            // HAL_Delay(100);
-            printf("Task 1: %d\n", count1);
-            task_delay(500);
-            count1 = 0;
-            // yield(); // 手动切换
-        }
-        count1++;
+        return NULL;
+    }
+    sem->count = count;
+    vListInit(&sem->waitingList); // 初始化等待链表
+    return sem;
+}
+
+/**
+ * @brief 等待信号量
+ * @param sem 信号量指针
+ */
+void semaphoreWait(Semaphore_t *sem)
+{
+    __disable_irq(); // 进入临界区，禁止中断
+    sem->count--;
+    if (sem->count < 0)
+    {
+        // 删除当前任务在就绪链表中的节点
+        vListRemove(&currentTCB->stateListItem);
+        // 将当前任务添加到信号量的等待链表中,按照优先级排序
+        vListInsert((vList *)&sem->waitingList, &currentTCB->stateListItem);
+        // 阻塞当前任务
+        currentTCB->state = BLOCKED;
+        __enable_irq(); // 退出临界区，允许中断
+        // 切换到下一个任务
+        taskYield();
+    }
+    else
+    {
+        __enable_irq(); // 退出临界区，允许中断
     }
 }
 
-void task_func2() {
-    static int count2 = 0;
-    while(1)
+/**
+ * @brief 释放信号量
+ * @param sem 信号量指针
+ */
+void semaphoreSignal(Semaphore_t *sem)
+{
+    __disable_irq(); // 进入临界区，禁止中断
+    sem->count++;
+
+    // 从信号量的等待链表中取出一个任务
+    ListItem_t *waitingItem = sem->waitingList.end.next;
+    TCB_t *task = (TCB_t *)waitingItem->pvOwner;
+    if (sem->count <= 0)
     {
-        if (count2 == 5000)
+        if (waitingItem != &sem->waitingList.end)
         {
-            HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_5);
-            printf("Task 2: %d\n", count2);
-            task_delay(500);
-            count2 = 0;
-            // yield(); // 手动切换
+            // 将任务从等待链表中移除
+            vListRemove(waitingItem);
+            // 设置任务状态为就绪
+            task->state = READY;
+            // 将任务添加到就绪链表中
+            vListInsert(&readyList, &task->stateListItem);
         }
-        count2++;
+    }
+    __enable_irq(); // 退出临界区，允许中断
+    // 如果新就绪的任务优先级高于当前正在运行的任务，则触发 PendSV 进行任务切换
+    if (task->priority > currentTCB->priority)
+    {
+        taskYield(); // 触发任务切换
     }
 }
 
-void task_func3() {
-    static int count3 = 0;
-    while(1)
+/**
+ * @brief 初始化二值信号量，初始计数为0，用于任务间同步
+ * @param sem 信号量指针
+ */
+Semaphore_t *semaphoreBinaryInit(void)
+{
+    Semaphore_t *sem = semaphoreInit(0); // 二值信号量初始计数为0
+    return sem;
+}
+
+/**
+ * @brief 等待二值信号量
+ * @param sem 信号量指针
+ */
+void semaphoreBinaryWait(Semaphore_t *sem)
+{
+    semaphoreWait(sem); // 直接调用普通信号量的等待函数
+}
+
+/**
+ * @brief 释放二值信号量
+ * @param sem 信号量指针
+ */
+void semaphoreBinarySignal(Semaphore_t *sem)
+{
+    if(sem->count < 1)
     {
-        if (count3 == 5000)
+        __disable_irq(); // 进入临界区，禁止中断
+        sem->count++; // 二值信号量只能释放一次
+        // 从信号量的等待链表中取出一个任务
+        ListItem_t *waitingItem = sem->waitingList.end.next;
+        TCB_t *task = (TCB_t *)waitingItem->pvOwner;
+        if (sem->count <= 0)
         {
-            HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_0);
-            printf("Task 3: %d\n", count3);
-            task_delay(200);
-            count3 = 0;
-            // yield(); // 手动切换
+            if (waitingItem != &sem->waitingList.end)
+            {
+                // 将任务从等待链表中移除
+                vListRemove(waitingItem);
+                // 设置任务状态为就绪
+                task->state = READY;
+                // 将任务添加到就绪链表中
+                vListInsert(&readyList, &task->stateListItem);
+            }
         }
-        count3++;
+        __enable_irq(); // 退出临界区，允许中断
+        // 如果新就绪的任务优先级高于当前正在运行的任务，则触发 PendSV 进行任务切换
+        if (task->priority > currentTCB->priority)
+        {
+            taskYield(); // 触发任务切换
+        }
     }
 }
 
-void task_idle() {
-    while(1)
-    {
-        // 空闲任务可以进入低功耗模式
-        __WFI(); // 等待中断
-    }
-}
+/***************************************************************/

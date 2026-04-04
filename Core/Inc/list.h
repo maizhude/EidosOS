@@ -1,7 +1,13 @@
 #ifndef __LIST_H
 #define __LIST_H
 
+/*********************** Includes *****************************/
 #include <stdint.h>
+
+/*********************** Macro Definitions *******************/
+
+/*********************** Type Definitions ********************/
+
 struct List;
 
 typedef struct ListItem
@@ -19,7 +25,7 @@ typedef struct List
     ListItem_t *index;
     ListItem_t end;
 } vList;
-
+/*********************** Function Prototypes *****************/
 
 //初始化节点
 void vListItemInit(ListItem_t *node);
