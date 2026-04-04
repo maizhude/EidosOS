@@ -279,6 +279,7 @@ void semaphoreSignal(Semaphore_t *sem)
             }
             // 设置任务状态为就绪
             task->state = READY;
+            task->stateListItem.value = task->priority; // 更新节点值为优先级，便于就绪链表排序
             // 将任务状态节点添加到就绪链表中
             vListInsert(&readyList, &task->stateListItem, 0);
         }
@@ -335,6 +336,7 @@ void semaphoreBinarySignal(Semaphore_t *sem)
                 }
                 // 设置任务状态为就绪
                 task->state = READY;
+                task->stateListItem.value = task->priority; // 更新节点值为优先级，便于就绪链表排序
                 // 将任务状态节点添加到就绪链表中
                 vListInsert(&readyList, &task->stateListItem, 0);
             }
@@ -382,4 +384,80 @@ int semaphoreBinaryWaitTimeout(Semaphore_t *sem, uint32_t timeout)
     }
 }
 
+/**
+ * @brief 初始化互斥锁
+ * @return Mutex_t* 互斥锁指针
+ */
+Mutex_t *mutexInit(void)
+{
+    Mutex_t *mutex = (Mutex_t *)malloc(sizeof(Mutex_t));
+    if (mutex != NULL)
+    {
+        mutex->locked = 0;
+        mutex->owner = NULL;
+        vListInit(&mutex->waitingList);
+    }
+    return mutex;
+}
+
+void mutexLock(Mutex_t *mutex)
+{
+    if (mutex->locked && mutex->owner == currentTCB)
+    {
+        // 递归锁定，直接返回
+        return;
+    }
+    if (mutex->locked == 0)
+    {
+        // 获取互斥锁
+        mutex->locked = 1;
+        mutex->owner = currentTCB;
+    }
+    else
+    {
+        // 删除当前任务在就绪链表中的状态节点
+        vListRemove(&currentTCB->stateListItem);
+        // 将当前任务事件节点添加到互斥锁的等待链表中,按照优先级排序
+        vListInsert((vList *)&mutex->waitingList, &currentTCB->eventListItem, 0);
+        // 阻塞当前任务
+        currentTCB->state = BLOCKED;
+        // 切换到下一个任务
+        taskYield();
+    }
+}
+
+void mutexUnlock(Mutex_t *mutex)
+{
+    if (mutex->owner != currentTCB)
+    {
+        // 只有拥有互斥锁的任务才能解锁
+        return;
+    }
+
+    if (mutex->waitingList.itemNumber > 0)
+    {
+        // 从互斥锁的等待链表中取出一个任务
+        ListItem_t *waitingItem = mutex->waitingList.end.next;
+        TCB_t *task = (TCB_t *)waitingItem->pvOwner;
+        // 将任务事件节点从等待链表中移除
+        vListRemove(waitingItem);
+        if (vListIsInList(&task->stateListItem)) // 如果任务状态节点还在延时链表中，先移除
+        {
+            vListRemove(&task->stateListItem);
+        }
+        // 设置任务状态为就绪
+        task->state = READY;
+        task->stateListItem.value = task->priority; // 更新节点值为优先级，便于就绪链表排序
+        // 将任务状态节点添加到就绪链表中
+        vListInsert(&readyList, &task->stateListItem, 0);
+        // 将互斥锁所有权转移给下一个任务
+        mutex->owner = task;
+    }
+    else
+    {
+        // 没有等待的任务，直接解锁
+        mutex->locked = 0;
+        mutex->owner = NULL;
+    }
+}
 /***************************************************************/

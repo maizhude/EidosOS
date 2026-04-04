@@ -5,7 +5,7 @@
 #include "list.h"
 
 extern Semaphore_t *semKey;        // 二值信号量
-
+extern Mutex_t *mutexKey;              // 互斥锁   
 //按键获取函数
 int getKeyState()
 {
@@ -18,6 +18,7 @@ void task_func1()
     static int count1 = 0;
     while (1)
     {
+        mutexLock(mutexKey); // 获取互斥锁
         if (count1 == 5000)
         {
             HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_1);
@@ -27,28 +28,23 @@ void task_func1()
             count1 = 0;
             // yield(); // 手动切换
         }
-        if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0) == GPIO_PIN_SET)
-        {
-            semaphoreBinarySignal(semKey); // 释放信号量，唤醒等待的任务
-        }
         count1++;
+        mutexUnlock(mutexKey); // 释放互斥锁
     }
 }
 
 void task_func2()
 {
-    static int count2 = 0;
     while (1)
     {
-        semaphoreBinaryWaitTimeout(semKey, 1000);// 等待信号量
-        
-        HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_5);
-        printf("Task 2: %d\n", count2);
-        // taskDelay(500);
-        count2 = 0;
-        // yield(); // 手动切换
-        
-        count2++;
+        mutexLock(mutexKey); // 获取互斥锁
+        // 访问共享资源
+        printf("Task with mutex is running.\n");
+        taskDelay(10000);     // 模拟任务执行时间
+        printf("Task with mutex is running.\n");
+        mutexUnlock(mutexKey); // 释放互斥锁
+        printf("Task with mutex is running.\n");
+        taskDelay(10000);
     }
 }
 
@@ -61,7 +57,7 @@ void task_func3()
         {
             HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_0);
             printf("Task 3: %d\n", count3);
-            taskDelay(200);
+            taskDelay(500);
             count3 = 0;
             // yield(); // 手动切换
         }

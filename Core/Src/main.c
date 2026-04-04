@@ -53,6 +53,7 @@ uint32_t currentTicks = 0; // 系统滴答数
 extern vList delayList;    // 任务延迟链表
 extern vList readyList;    // 就绪链表
 Semaphore_t *semKey;        // 二值信号量
+Mutex_t *mutexKey;              // 互斥锁
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -133,6 +134,7 @@ int main(void)
   vListInit(&delayList);
   vListInit(&readyList);
   semKey = semaphoreBinaryInit(); // 初始化二值信号量
+  mutexKey = mutexInit(); // 初始化互斥锁
   taskInit(task_func1, 2, NULL, STACK_SIZE);
   taskInit(task_func2, 3, NULL, STACK_SIZE);
   taskInit(task_func3, 4, NULL, STACK_SIZE);

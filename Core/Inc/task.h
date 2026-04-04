@@ -30,6 +30,12 @@ typedef struct semaphore
     vList waitingList; // 等待该信号量的任务链表
 } Semaphore_t;
 
+typedef struct mutex
+{
+    int locked; // 0表示未锁定，1表示已锁定
+    TCB_t *owner; // 当前拥有该互斥锁的任务
+    vList waitingList; // 等待该互斥锁的任务链表
+}Mutex_t;
 /*********************** Function Prototypes *****************/
 
 int taskInit(void (*func)(void *), int priority, void *const pvParameters, uint32_t stackSize);
@@ -43,6 +49,8 @@ Semaphore_t *semaphoreInit(int initialCount);
 void semaphoreBinarySignal(Semaphore_t *sem);
 void semaphoreBinaryWait(Semaphore_t *sem);
 int semaphoreBinaryWaitTimeout(Semaphore_t *sem, uint32_t timeout);
-
+Mutex_t *mutexInit(void);
+void mutexLock(Mutex_t *mutex);
+void mutexUnlock(Mutex_t *mutex);
 
 #endif /* __TASK_H */
