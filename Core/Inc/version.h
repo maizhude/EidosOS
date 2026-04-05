@@ -8,7 +8,7 @@
  * @date    2026-03-23
  *
  * @version history
-Version             | Date          | Author        | Description           
+Version             | Date          | Author        | Description
 
 V1.0.00             2026-03-23      whx             1、初始版本，能够通过任务主动Yield切换任务
 V1.0.01             2026-03-23      whx             1、增加系统滴答定时器，每秒触发一次任务切换
@@ -27,7 +27,9 @@ V1.1.02             2026-03-31      whx             1、增加信号量机制
                                                     3、实现信号量延时等待功能
 V1.1.03             2026-04-04      whx             1、增加互斥锁机制
                                                     2、实现互斥锁的基本功能，支持优先级继承，解决优先级反转问题，实际上实在加锁过程中判断获取锁的任务优先级是否高于当前锁的拥有者，如果是，则将锁的拥有者的优先级提升到获取锁的任务的优先级，直到锁被释放
- 
+V1.1.04             2026-04-05      whx             1、重构信号量和互斥锁的等待机制，使用事件结构体管理任务等待链表
+
+
  * @note
  * 每次版本升级，请在此处追加记录：
  * 1. 修改版本号宏
@@ -37,7 +39,7 @@ V1.1.03             2026-04-04      whx             1、增加互斥锁机制
 /* ================= Version Macros ================= */
 #define VERSION_MAJOR    1   /* 主版本号 */
 #define VERSION_MINOR    1   /* 次版本号 */
-#define VERSION_PATCH    3   /* 修订版本号 */
+#define VERSION_PATCH    4   /* 修订版本号 */
 
 /* ================= Version String ================= */
 const char* GetVersionString(void);

@@ -212,6 +212,57 @@ void prvPortStartFirstTask( void )
 				);
 }
 
+static void eventWait(Event_t *event)
+{
+    // 删除当前任务在就绪链表中的状态节点
+    vListRemove(&currentTCB->stateListItem);
+    // 将当前任务事件节点添加到事件的等待链表中,按照优先级排序
+    vListInsert((vList *)&event->waitingList, &currentTCB->eventListItem, 0);
+    // 阻塞当前任务
+    currentTCB->state = BLOCKED;
+    // 切换到下一个任务
+    taskYield();
+}
+
+static void eventWaitTimeout(Event_t *event, uint32_t timeout)
+{
+    // 删除当前任务在就绪链表中的状态节点
+    vListRemove(&currentTCB->stateListItem);
+    // 将当前任务事件节点添加到事件的等待链表中,按照优先级排序
+    vListInsert((vList *)&event->waitingList, &currentTCB->eventListItem, 0);
+    // 阻塞当前任务
+    currentTCB->state = BLOCKED;
+    // 设置节点的延时值为绝对时间，便于在延迟链表中排序
+    currentTCB->stateListItem.value = currentTicks + timeout;
+    // 插入延迟链表，按照剩余时间排序
+    vListInsert(&delayList, &currentTCB->stateListItem, 1);
+    // 切换到下一个任务
+    taskYield();
+}
+
+static TCB_t *wakeUpFromEvent(Event_t *event)
+{
+    if (event->waitingList.itemNumber > 0)
+    {
+        // 从事件的等待链表中取出一个任务
+        ListItem_t *waitingItem = event->waitingList.end.next;
+        TCB_t *task = (TCB_t *)waitingItem->pvOwner;
+        // 将任务事件节点从等待链表中移除
+        vListRemove(waitingItem);
+        if (vListIsInList(&task->stateListItem)) // 如果任务状态节点还在延时链表中，先移除
+        {
+            vListRemove(&task->stateListItem);
+        }
+        // 设置任务状态为就绪
+        task->state = READY;
+        task->stateListItem.value = task->priority; // 更新节点值为优先级，便于就绪链表排序
+        // 将任务状态节点添加到就绪链表中
+        vListInsert(&readyList, &task->stateListItem, 0);
+        return task;
+    }
+    return NULL;
+}
+
 /**
  * @brief 初始化信号量
  * @param sem 信号量指针
@@ -225,7 +276,7 @@ Semaphore_t *semaphoreInit(int count)
         return NULL;
     }
     sem->count = count;
-    vListInit(&sem->waitingList); // 初始化等待链表
+    vListInit(&sem->event.waitingList); // 初始化等待链表
     return sem;
 }
 
@@ -239,15 +290,8 @@ void semaphoreWait(Semaphore_t *sem)
     sem->count--;
     if (sem->count < 0)
     {
-        // 删除当前任务在就绪链表中的状态节点
-        vListRemove(&currentTCB->stateListItem);
-        // 将当前任务事件节点添加到信号量的等待链表中,按照优先级排序
-        vListInsert((vList *)&sem->waitingList, &currentTCB->eventListItem, 0);
-        // 阻塞当前任务
-        currentTCB->state = BLOCKED;
-        __enable_irq(); // 退出临界区，允许中断
-        // 切换到下一个任务
-        taskYield();
+        eventWait(&sem->event); // 阻塞当前任务，等待信号量事件
+        __enable_irq(); // 退出临界区，允许中断 
     }
     else
     {
@@ -261,32 +305,17 @@ void semaphoreWait(Semaphore_t *sem)
  */
 void semaphoreSignal(Semaphore_t *sem)
 {
+    TCB_t *wakeTask = NULL;
     __disable_irq(); // 进入临界区，禁止中断
     sem->count++;
 
-    // 从信号量的等待链表中取出一个任务
-    ListItem_t *waitingItem = sem->waitingList.end.next;
-    TCB_t *task = (TCB_t *)waitingItem->pvOwner;
     if (sem->count <= 0)
     {
-        if (waitingItem != &sem->waitingList.end)
-        {
-            // 将任务事件节点从等待链表中移除
-            vListRemove(waitingItem);
-            if (vListIsInList(&task->stateListItem)) // 如果任务状态节点还在延时链表中，先移除
-            {
-                vListRemove(&task->stateListItem);
-            }
-            // 设置任务状态为就绪
-            task->state = READY;
-            task->stateListItem.value = task->priority; // 更新节点值为优先级，便于就绪链表排序
-            // 将任务状态节点添加到就绪链表中
-            vListInsert(&readyList, &task->stateListItem, 0);
-        }
+        wakeTask = wakeUpFromEvent(&sem->event);
     }
     __enable_irq(); // 退出临界区，允许中断
     // 如果新就绪的任务优先级高于当前正在运行的任务，则触发 PendSV 进行任务切换
-    if (task->priority > currentTCB->priority)
+    if (wakeTask && wakeTask->priority > currentTCB->priority)
     {
         taskYield(); // 触发任务切换
     }
@@ -319,34 +348,7 @@ void semaphoreBinarySignal(Semaphore_t *sem)
 {
     if(sem->count < 1)
     {
-        __disable_irq(); // 进入临界区，禁止中断
-        sem->count++; // 二值信号量只能释放一次
-        // 从信号量的等待链表中取出一个任务
-        ListItem_t *waitingItem = sem->waitingList.end.next;
-        TCB_t *task = (TCB_t *)waitingItem->pvOwner;
-        if (sem->count <= 0)
-        {
-            if (waitingItem != &sem->waitingList.end)
-            {
-                // 将任务事件节点从等待链表中移除
-                vListRemove(waitingItem);
-                if (vListIsInList(&task->stateListItem)) // 如果任务状态节点还在延时链表中，先移除
-                {
-                    vListRemove(&task->stateListItem);
-                }
-                // 设置任务状态为就绪
-                task->state = READY;
-                task->stateListItem.value = task->priority; // 更新节点值为优先级，便于就绪链表排序
-                // 将任务状态节点添加到就绪链表中
-                vListInsert(&readyList, &task->stateListItem, 0);
-            }
-        }
-        __enable_irq(); // 退出临界区，允许中断
-        // 如果新就绪的任务优先级高于当前正在运行的任务，则触发 PendSV 进行任务切换
-        if (task->priority > currentTCB->priority)
-        {
-            taskYield(); // 触发任务切换
-        }
+        semaphoreSignal(sem); // 直接调用普通信号量的释放函数
     }
 }
 
@@ -362,19 +364,8 @@ int semaphoreBinaryWaitTimeout(Semaphore_t *sem, uint32_t timeout)
     sem->count--;
     if (sem->count < 0)
     {
-        // 删除当前任务在就绪链表中的状态节点
-        vListRemove(&currentTCB->stateListItem);
-        // 将当前任务事件节点添加到信号量的等待链表中,按照优先级排序
-        vListInsert((vList *)&sem->waitingList, &currentTCB->eventListItem, 0);
-        // 阻塞当前任务
-        currentTCB->state = BLOCKED;
-        // 设置节点的延时值为绝对时间，便于在延迟链表中排序
-        currentTCB->stateListItem.value = currentTicks + timeout;
-        // 插入延迟链表，按照剩余时间排序
-        vListInsert(&delayList, &currentTCB->stateListItem, 1);
-        __enable_irq(); // 退出临界区，允许中断
-        // 切换到下一个任务
-        taskYield();
+        eventWaitTimeout(&sem->event, timeout);
+        __enable_irq();
         return 0; // 超时返回0
     }
     else
@@ -395,7 +386,7 @@ Mutex_t *mutexInit(void)
     {
         mutex->locked = 0;
         mutex->owner = NULL;
-        vListInit(&mutex->waitingList);
+        vListInit(&mutex->event.waitingList); // 初始化等待链表
     }
     return mutex;
 }
@@ -407,6 +398,7 @@ void mutexLock(Mutex_t *mutex)
         // 递归锁定，直接返回
         return;
     }
+    __disable_irq(); // 进入临界区，禁止中断
     if (mutex->locked == 0)
     {
         // 获取互斥锁
@@ -415,12 +407,7 @@ void mutexLock(Mutex_t *mutex)
     }
     else
     {
-        // 删除当前任务在就绪链表中的状态节点
-        vListRemove(&currentTCB->stateListItem);
-        // 将当前任务事件节点添加到互斥锁的等待链表中,按照优先级排序
-        vListInsert((vList *)&mutex->waitingList, &currentTCB->eventListItem, 0);
-        // 阻塞当前任务
-        currentTCB->state = BLOCKED;
+        eventWait(&mutex->event); // 阻塞当前任务，等待互斥锁事件
         if (currentTCB->priority > mutex->owner->priority)
         {
             // 优先级继承
@@ -432,37 +419,24 @@ void mutexLock(Mutex_t *mutex)
                 vListInsert(&readyList, &mutex->owner->stateListItem, 0);
             }
         }
-        // 切换到下一个任务
-        taskYield();
     }
+    __enable_irq(); // 退出临界区，允许中断
 }
 
 void mutexUnlock(Mutex_t *mutex)
 {
+    TCB_t *wakeTask = NULL;
     if (mutex->owner != currentTCB)
     {
         // 只有拥有互斥锁的任务才能解锁
         return;
     }
-
-    if (mutex->waitingList.itemNumber > 0)
+    __disable_irq(); // 进入临界区，禁止中断
+    wakeTask = wakeUpFromEvent(&mutex->event);
+    if (wakeTask != NULL)
     {
-        // 从互斥锁的等待链表中取出一个任务
-        ListItem_t *waitingItem = mutex->waitingList.end.next;
-        TCB_t *task = (TCB_t *)waitingItem->pvOwner;
-        // 将任务事件节点从等待链表中移除
-        vListRemove(waitingItem);
-        if (vListIsInList(&task->stateListItem)) // 如果任务状态节点还在延时链表中，先移除
-        {
-            vListRemove(&task->stateListItem);
-        }
-        // 设置任务状态为就绪
-        task->state = READY;
-        task->stateListItem.value = task->priority; // 更新节点值为优先级(同时解决优先级继承问题)，便于就绪链表排序
-        // 将任务状态节点添加到就绪链表中
-        vListInsert(&readyList, &task->stateListItem, 0);
         // 将互斥锁所有权转移给下一个任务
-        mutex->owner = task;
+        mutex->owner = wakeTask;
     }
     else
     {
@@ -470,5 +444,6 @@ void mutexUnlock(Mutex_t *mutex)
         mutex->locked = 0;
         mutex->owner = NULL;
     }
+    __enable_irq(); // 退出临界区，允许中断
 }
 /***************************************************************/
