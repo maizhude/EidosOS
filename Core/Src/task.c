@@ -421,6 +421,17 @@ void mutexLock(Mutex_t *mutex)
         vListInsert((vList *)&mutex->waitingList, &currentTCB->eventListItem, 0);
         // 阻塞当前任务
         currentTCB->state = BLOCKED;
+        if (currentTCB->priority > mutex->owner->priority)
+        {
+            // 优先级继承
+            mutex->owner->stateListItem.value = mutex->owner->priority; // 更新节点值为新的优先级，便于就绪链表排序
+            // 如果互斥锁拥有者在就绪链表中，重新排序
+            if (vListIsInList(&mutex->owner->stateListItem))
+            {
+                vListRemove(&mutex->owner->stateListItem);
+                vListInsert(&readyList, &mutex->owner->stateListItem, 0);
+            }
+        }
         // 切换到下一个任务
         taskYield();
     }
@@ -447,7 +458,7 @@ void mutexUnlock(Mutex_t *mutex)
         }
         // 设置任务状态为就绪
         task->state = READY;
-        task->stateListItem.value = task->priority; // 更新节点值为优先级，便于就绪链表排序
+        task->stateListItem.value = task->priority; // 更新节点值为优先级(同时解决优先级继承问题)，便于就绪链表排序
         // 将任务状态节点添加到就绪链表中
         vListInsert(&readyList, &task->stateListItem, 0);
         // 将互斥锁所有权转移给下一个任务
