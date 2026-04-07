@@ -264,9 +264,9 @@ void SysTick_Handler(void)
       task->state = READY;
       // 从延迟链表中移除当前任务
       vListRemove(&task->stateListItem);
-      if(vListIsInList(&task->eventListItem)) // 如果任务事件节点还在信号量等待链表中，先移除
+      if(vListIsInList(&task->eventNode.eventListItem)) // 如果任务事件节点还在信号量等待链表中，先移除
       {
-          vListRemove(&task->eventListItem);
+          vListRemove(&task->eventNode.eventListItem);
       }
       // 设置优先级
       task->stateListItem.value = task->priority;

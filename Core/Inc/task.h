@@ -14,6 +14,16 @@ typedef enum
     BLOCKED
 } task_state_t;
 
+typedef struct eventNode
+{
+    ListItem_t eventListItem;
+
+    // EventGroup 用
+    uint32_t waitBits;
+    uint8_t waitMode; // 0表示等待所有事件，1表示等待任一事件
+
+} EventNode_t;
+
 typedef struct TCB
 {
     uint32_t *sp;        // 堆栈指针，必须在第一个位置，以便在上下文切换时正确保存和恢复
@@ -21,7 +31,7 @@ typedef struct TCB
     int priority;
     task_state_t state;
     ListItem_t stateListItem; // 用于将任务添加到不同的状态链表中的节点
-    ListItem_t eventListItem; // 用于将任务添加到事件链表中的节点
+    EventNode_t eventNode; // 任务等待事件的节点
 } TCB_t;
 
 typedef struct event
@@ -41,6 +51,15 @@ typedef struct mutex
     TCB_t *owner; // 当前拥有该互斥锁的任务
     Event_t event; // 等待该互斥锁的任务链表
 }Mutex_t;
+
+typedef struct eventGroup
+{
+    uint32_t eventBits; // 当前事件位，每一位代表一个事件
+    Event_t event; // 等待该事件组的任务链表
+} EventGroup_t;
+
+
+
 /*********************** Function Prototypes *****************/
 
 int taskInit(void (*func)(void *), int priority, void *const pvParameters, uint32_t stackSize);
@@ -57,5 +76,8 @@ int semaphoreBinaryWaitTimeout(Semaphore_t *sem, uint32_t timeout);
 Mutex_t *mutexInit(void);
 void mutexLock(Mutex_t *mutex);
 void mutexUnlock(Mutex_t *mutex);
+EventGroup_t *eventGroupInit(void);
+void eventGroupWaitBits(EventGroup_t *eventGroup, uint32_t waitBits, uint8_t waitMode);
+void eventGroupSetBits(EventGroup_t *eventGroup, uint32_t bitsToSet);
 
 #endif /* __TASK_H */

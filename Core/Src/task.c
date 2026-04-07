@@ -98,11 +98,11 @@ uint32_t *myInitialiseStack(uint32_t *stack_top, void (*taskFunc)(void *), void 
 void taskListItemInit(TCB_t *task)
 {
     vListItemInit(&task->stateListItem);
-    vListItemInit(&task->eventListItem);
+    vListItemInit(&task->eventNode.eventListItem);
     task->stateListItem.pvOwner = task; // 设置节点所属任务
-    task->eventListItem.pvOwner = task; // 设置节点所属任务
+    task->eventNode.eventListItem.pvOwner = task; // 设置节点所属任务
     task->stateListItem.value = task->priority; // 将优先级作为节点值，便于排序
-    task->eventListItem.value = 0; // 事件链表节点值暂
+    task->eventNode.eventListItem.value = 0; // 事件链表节点值暂
 }
 
 /**
@@ -217,7 +217,7 @@ static void eventWait(Event_t *event)
     // 删除当前任务在就绪链表中的状态节点
     vListRemove(&currentTCB->stateListItem);
     // 将当前任务事件节点添加到事件的等待链表中,按照优先级排序
-    vListInsert((vList *)&event->waitingList, &currentTCB->eventListItem, 0);
+    vListInsert((vList *)&event->waitingList, &currentTCB->eventNode.eventListItem, 0);
     // 阻塞当前任务
     currentTCB->state = BLOCKED;
     // 切换到下一个任务
@@ -229,7 +229,7 @@ static void eventWaitTimeout(Event_t *event, uint32_t timeout)
     // 删除当前任务在就绪链表中的状态节点
     vListRemove(&currentTCB->stateListItem);
     // 将当前任务事件节点添加到事件的等待链表中,按照优先级排序
-    vListInsert((vList *)&event->waitingList, &currentTCB->eventListItem, 0);
+    vListInsert((vList *)&event->waitingList, &currentTCB->eventNode.eventListItem, 0);
     // 阻塞当前任务
     currentTCB->state = BLOCKED;
     // 设置节点的延时值为绝对时间，便于在延迟链表中排序
@@ -391,6 +391,10 @@ Mutex_t *mutexInit(void)
     return mutex;
 }
 
+/**
+ * @brief 锁定互斥锁
+ * @param mutex 互斥锁指针
+ */
 void mutexLock(Mutex_t *mutex)
 {
     if (mutex->locked && mutex->owner == currentTCB)
@@ -423,6 +427,10 @@ void mutexLock(Mutex_t *mutex)
     __enable_irq(); // 退出临界区，允许中断
 }
 
+/**
+ * @brief 解锁互斥锁
+ * @param mutex 互斥锁指针
+ */
 void mutexUnlock(Mutex_t *mutex)
 {
     TCB_t *wakeTask = NULL;
@@ -445,5 +453,90 @@ void mutexUnlock(Mutex_t *mutex)
         mutex->owner = NULL;
     }
     __enable_irq(); // 退出临界区，允许中断
+}
+
+/**
+ * @brief 初始化事件组
+ * @return EventGroup_t* 事件组指针
+ */
+EventGroup_t *eventGroupInit(void)
+{
+    EventGroup_t *eventGroup = (EventGroup_t *)malloc(sizeof(EventGroup_t));
+    if (eventGroup != NULL)
+    {
+        eventGroup->eventBits = 0;
+        vListInit(&eventGroup->event.waitingList); // 初始化等待链表
+    }
+    return eventGroup;
+}
+
+/**
+ * @brief 等待事件组中的事件
+ * @param eventGroup 事件组指针
+ * @param waitBits 等待的事件位掩码
+ * @param waitMode 等待模式，0表示等待所有事件，1表示等待任一事件
+ */
+void eventGroupWaitBits(EventGroup_t *eventGroup, uint32_t waitBits, uint8_t waitMode)
+{
+    currentTCB->eventNode.waitBits = waitBits;
+    currentTCB->eventNode.waitMode = waitMode;
+
+    __disable_irq(); // 进入临界区，禁止中断
+    eventWait(&eventGroup->event); // 阻塞当前任务，等待事件组事件
+    __enable_irq(); // 退出临界区，允许中断
+}
+
+/**
+ * @brief 设置事件组中的事件位
+ * @param eventGroup 事件组指针
+ * @param bitsToSet 要设置的事件位掩码
+ */
+void eventGroupSetBits(EventGroup_t *eventGroup, uint32_t bitsToSet)
+{
+    TCB_t *wakeTask = NULL;
+    __disable_irq(); // 进入临界区，禁止中断
+    eventGroup->eventBits |= bitsToSet; // 设置事件位
+
+    // 检查等待链表中的任务是否满足唤醒条件
+    ListItem_t *currentItem = eventGroup->event.waitingList.end.next;
+    while (currentItem != &eventGroup->event.waitingList.end)
+    {
+        EventNode_t *waitNode = (EventNode_t *)currentItem;
+        TCB_t *task = (TCB_t *)waitNode->eventListItem.pvOwner;
+        uint32_t waitBits = waitNode->waitBits;
+        uint8_t waitMode = waitNode->waitMode;
+
+        int conditionMet = 0;
+        if (waitMode == 0) // 等待所有事件
+        {
+            conditionMet = ((eventGroup->eventBits & waitBits) == waitBits);
+        }
+        else // 等待任一事件
+        {
+            conditionMet = ((eventGroup->eventBits & waitBits) != 0);
+        }
+
+        if (conditionMet)
+        {
+            // 从事件的等待链表中移除当前任务
+            vListRemove(&waitNode->eventListItem);
+            if (vListIsInList(&task->stateListItem)) // 如果任务状态节点还在延时链表中，先移除
+            {
+                vListRemove(&task->stateListItem);
+            }
+            // 设置任务状态为就绪
+            task->state = READY;
+            task->stateListItem.value = task->priority; // 更新节点值为优先级，便于就绪链表排序
+            // 将任务状态节点添加到就绪链表中
+            vListInsert(&readyList, &task->stateListItem, 0);
+        }
+        currentItem = currentItem->next;
+    }
+    __enable_irq(); // 退出临界区，允许中断
+    // 如果新就绪的任务优先级高于当前正在运行的任务，则触发 PendSV 进行任务切换
+    if (wakeTask && wakeTask->priority > currentTCB->priority)
+    {
+        taskYield(); // 触发任务切换
+    }
 }
 /***************************************************************/
