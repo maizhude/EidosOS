@@ -3,6 +3,7 @@
 /*********************** Includes *****************************/
 #include <stdint.h>
 #include "list.h"
+#include "queue.h"
 /*********************** Macro Definitions *******************/
 #define MAX_TASKS 10
 #define STACK_SIZE 1024
@@ -58,7 +59,12 @@ typedef struct eventGroup
     Event_t event; // 等待该事件组的任务链表
 } EventGroup_t;
 
-
+typedef struct MessageQueue
+{
+    Queue_t queue; // 队列结构体
+    Event_t sendEvent; // 等待发生数据的任务链表
+    Event_t recvEvent; // 等待接收数据的任务链表
+} MessageQueue_t;
 
 /*********************** Function Prototypes *****************/
 

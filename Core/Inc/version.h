@@ -30,6 +30,7 @@ V1.1.03             2026-04-04      whx             1、增加互斥锁机制
 V1.1.04             2026-04-05      whx             1、重构信号量和互斥锁的等待机制，使用事件结构体管理任务等待链表
 V1.1.05             2026-04-06      whx             1、增加事件组机制
                                                     2、实现事件组的基本功能，支持任务等待多个事件位，支持等待任一事件或所有事件
+V1.1.06             2026-04-12      whx             1、增加消息队列机制
 
 
  * @note
@@ -41,7 +42,7 @@ V1.1.05             2026-04-06      whx             1、增加事件组机制
 /* ================= Version Macros ================= */
 #define VERSION_MAJOR    1   /* 主版本号 */
 #define VERSION_MINOR    1   /* 次版本号 */
-#define VERSION_PATCH    5   /* 修订版本号 */
+#define VERSION_PATCH    6   /* 修订版本号 */
 
 /* ================= Version String ================= */
 const char* GetVersionString(void);

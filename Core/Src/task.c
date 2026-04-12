@@ -539,4 +539,107 @@ void eventGroupSetBits(EventGroup_t *eventGroup, uint32_t bitsToSet)
         taskYield(); // 触发任务切换
     }
 }
+
+/**
+ * @brief 清除事件组中的事件位
+ * @param eventGroup 事件组指针
+ * @param bitsToClear 要清除的事件位掩码
+ */
+void eventGroupClearBits(EventGroup_t *eventGroup, uint32_t bitsToClear)
+{
+    __disable_irq(); // 进入临界区，禁止中断
+    eventGroup->eventBits &= ~bitsToClear; // 清除事件位
+    __enable_irq(); // 退出临界区，允许中断
+}
+
+/**
+ * @brief 初始化消息队列
+ * @param itemSize 消息大小
+ * @param capacity 队列容量
+ * @return MessageQueue_t* 消息队列指针
+ */
+MessageQueue_t *messageQueueInit(uint32_t itemSize, uint32_t capacity)
+{
+    MessageQueue_t *msgQueue = (MessageQueue_t *)malloc(sizeof(MessageQueue_t));
+    if (msgQueue != NULL)
+    {
+        void *buffer = malloc(itemSize * capacity);
+        if (buffer == NULL)
+        {
+            free(msgQueue);
+            return NULL;
+        }
+        msgQueue->queue.buffer = buffer;
+        msgQueue->queue.itemSize = itemSize;
+        msgQueue->queue.capacity = capacity;
+        msgQueue->queue.head = 0;
+        msgQueue->queue.tail = 0;
+        msgQueue->queue.count = 0;
+        vListInit(&msgQueue->sendEvent.waitingList); // 初始化发送等待链表
+        vListInit(&msgQueue->recvEvent.waitingList); // 初始化接收等待链表
+    }
+    return msgQueue;
+}
+
+/**
+ * @brief 向消息队列发送数据
+ * @param msgQueue 消息队列指针
+ * @param item 要发送的数据指针
+ */
+int messageQueueSend(MessageQueue_t *msgQueue, const void *item)
+{
+    if (msgQueue == NULL || item == NULL)
+    {
+        return -1; // Failure
+    }
+    __disable_irq(); // 进入临界区，禁止中断
+    while(QueueIsFull(&msgQueue->queue))
+    {
+        // 队列满了，阻塞当前任务等待发送事件
+        eventWait(&msgQueue->sendEvent);
+    }
+    QueueEnqueue(&msgQueue->queue, item);
+    if (msgQueue->recvEvent.waitingList.itemNumber > 0)
+    {
+        // 唤醒一个等待接收数据的任务
+        TCB_t *wakeTask = wakeUpFromEvent(&msgQueue->recvEvent);
+        if (wakeTask && wakeTask->priority > currentTCB->priority)
+        {
+            taskYield(); // 触发任务切换
+        }
+    }
+    __enable_irq(); // 退出临界区，允许中断
+    return 0; // Success
+}
+
+/**
+ * @brief 从消息队列接收数据
+ * @param msgQueue 消息队列指针
+ * @param item 接收数据的缓冲区指针
+ */
+int messageQueueReceive(MessageQueue_t *msgQueue, void *item)
+{
+    if (msgQueue == NULL || item == NULL)
+    {
+        return -1; // Failure
+    }
+    __disable_irq(); // 进入临界区，禁止中断
+    while (QueueIsEmpty(&msgQueue->queue))
+    {
+        // 队列空了，阻塞当前任务等待接收事件
+        eventWait(&msgQueue->recvEvent);
+    }
+    QueueDequeue(&msgQueue->queue, item);
+    if (msgQueue->sendEvent.waitingList.itemNumber > 0)
+    {
+        // 唤醒一个等待发送数据的任务
+        TCB_t *wakeTask = wakeUpFromEvent(&msgQueue->sendEvent);
+        if (wakeTask && wakeTask->priority > currentTCB->priority)
+        {
+            taskYield(); // 触发任务切换
+        }
+    }
+    __enable_irq(); // 退出临界区，允许中断
+    return 0; // Success
+}
 /***************************************************************/
