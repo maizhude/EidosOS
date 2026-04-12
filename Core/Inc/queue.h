@@ -2,6 +2,8 @@
 #define __QUEUE_H
 /*********************** Includes *****************************/
 #include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
 /*********************** Macro Definitions *******************/
 #define QUEUE_LENGTH 64
 /*********************** Type Definitions ********************/

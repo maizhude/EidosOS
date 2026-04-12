@@ -28,6 +28,7 @@
 #include "version.h"
 #include "list.h"
 #include "test.h"
+#include "sync.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/

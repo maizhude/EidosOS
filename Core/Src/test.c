@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include "main.h"
 #include "list.h"
+#include "sync.h"
 
 extern Semaphore_t *semKey;        // 二值信号量
 extern Mutex_t *mutexKey;              // 互斥锁
