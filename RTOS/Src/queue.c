@@ -72,26 +72,36 @@ int QueueDequeue(Queue_t *queue, void *item)
 
 int QueueIsEmpty(Queue_t *queue)
 {
+    if (queue == NULL)
+        return -1;
     return queue->count == 0;
 }
 
 int QueueIsFull(Queue_t *queue)
 {
+    if (queue == NULL)
+        return -1;
     return queue->count == queue->capacity;
 }
 
 int QueueIsNotEmpty(Queue_t *queue)
 {
+    if (queue == NULL)
+        return -1;
     return queue->count > 0;
 }
 
 int QueueIsNotFull(Queue_t *queue)
 {
+    if (queue == NULL)
+        return -1;
     return queue->count < queue->capacity;
 }
 
 void QueueDestroy(Queue_t *queue)
 {
+    if (queue == NULL)
+        return;
     free(queue);
 }
 

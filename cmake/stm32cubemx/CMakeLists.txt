@@ -11,6 +11,7 @@ set(MX_Defines_Syms
 # STM32CubeMX generated include paths
 set(MX_Include_Dirs
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Inc
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../RTOS/Inc
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Drivers/STM32F1xx_HAL_Driver/Inc
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Drivers/STM32F1xx_HAL_Driver/Inc/Legacy
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Drivers/CMSIS/Device/ST/STM32F1xx/Include
@@ -26,10 +27,10 @@ set(MX_Application_Src
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/stm32f1xx_hal_msp.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/sysmem.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/syscalls.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/task.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/list.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/queue.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/sync.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../RTOS/Src/task.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../RTOS/Src/list.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../RTOS/Src/queue.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../RTOS/Src/sync.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/test.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/version.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../startup_stm32f103xe.s
