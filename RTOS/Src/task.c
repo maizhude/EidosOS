@@ -113,20 +113,20 @@ void taskListItemInit(TCB_t *task)
  * @param stackSize 栈大小
  * @return 初始化结果
  */
-int taskInit(void (*func)(void *), int priority, void *const pvParameters, uint32_t stackSize)
+TaskHandle_t taskInit(void (*func)(void *), int priority, void *const pvParameters, uint32_t stackSize)
 {
     // 创建新的任务控制块
     TCB_t *newTask = malloc(sizeof(TCB_t));
     if (newTask == NULL)
     {
-        return -1;
+        return NULL;
     }
     // 分配任务栈
     uint32_t *stack = malloc(stackSize);
     if (stack == NULL)
     {
         free(newTask);
-        return -1;
+        return NULL;
     }
     else
     {
@@ -136,13 +136,14 @@ int taskInit(void (*func)(void *), int priority, void *const pvParameters, uint3
         newTask->sp = myInitialiseStack(stack_top, func, pvParameters);
         newTask->state = READY;
         newTask->priority = priority;
+        newTask->notifyState = NOTIFY_NONE;
+        newTask->notifyValue = 0;
         // 初始化链表节点
         taskListItemInit(newTask);
         // 插入就绪链表
         vListInsert(&readyList, &newTask->stateListItem, 0);
     }
-    return 0;
-    
+    return newTask;
 }
 /**
  * @brief 选择优先级最高的就绪任务进行切换
@@ -257,6 +258,30 @@ void taskChangePriority(TCB_t *task, uint32_t newPriority)
         task->stateListItem.value = newPriority;
 
         vListInsert(&readyList, &task->stateListItem, 0);
+    }
+}
+
+void taskNotifyGive(TCB_t *task)
+{
+    task->notifyState = NOTIFY_RECEIVED;
+    // 如果任务正在等待通知事件，唤醒任务
+    if (vListIsInList(&task->stateListItem))
+    {
+        vListRemove(&task->stateListItem);
+        task->state = READY;
+        task->stateListItem.value = task->priority; // 更新节点值为优先级，便于就绪链表排序
+        vListInsert(&readyList, &task->stateListItem, 0);
+    }
+}
+
+void taskNotifyWait(uint32_t ClearCountOnExit, uint32_t timeout)
+{
+    // 没有收到通知，进入等待状态
+    currentTCB->notifyState = NOTIFY_WAITING;
+    taskDelay(timeout);
+    while (currentTCB->notifyState != NOTIFY_RECEIVED)
+    {
+
     }
 }
 /***************************************************************/

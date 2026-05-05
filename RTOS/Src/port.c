@@ -12,6 +12,7 @@ extern List_t delayList;		  // 任务延迟链表
 extern List_t readyList;		  // 就绪链表
 extern List_t timerList;		  // 定时器链表
 extern Semaphore_t *TimerTaskNotifySem; // 定时器任务通知信号量
+extern TaskHandle_t timerTask;			// 定时器任务句柄
 /*-----------------------------------------------------------*/
 
 void prvPortStartFirstTask( void )
@@ -67,10 +68,10 @@ void vPortSysTickHandler(void)
 	if (timerList.end.next != &timerList.end) // 如果系统滴答数达到了定时器链表中第一个定时器的超时时间
 	{	
 		Timer_t *timer = (Timer_t *)timerList.end.next->pvOwner;
-		if (currentTicks >= timer->expireTime)
+		if (timer != NULL && timer->expireTime == currentTicks)
 		{
 			// 通知定时器任务处理超时定时器
-			semaphoreBinarySignal(TimerTaskNotifySem);
+			taskNotifyGive(timerTask);
 		}
 	}
 	if (currentTCB != NULL)

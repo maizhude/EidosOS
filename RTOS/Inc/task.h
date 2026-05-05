@@ -15,10 +15,16 @@ typedef enum
     BLOCKED
 } task_state_t;
 
+typedef enum
+{
+    NOTIFY_NONE = 0,
+    NOTIFY_WAITING,
+    NOTIFY_RECEIVED
+} notify_state_t;
+
 typedef struct eventNode
 {
     ListItem_t eventListItem;
-
     // EventGroup 用
     uint32_t waitBits;
     uint8_t waitMode; // 0表示等待所有事件，1表示等待任一事件
@@ -31,6 +37,8 @@ typedef struct TCB
     uint16_t tick_count; // 任务运行的系统滴答数
     int priority;
     task_state_t state;
+    uint32_t notifyValue; // 任务通知值
+    notify_state_t notifyState; // 任务通知状态
     ListItem_t stateListItem; // 用于将任务添加到不同的状态链表中的节点
     EventNode_t eventNode; // 任务等待事件的节点
 } TCB_t;
@@ -39,16 +47,18 @@ typedef struct event
 {
     List_t waitingList;
 } Event_t;
-
+typedef struct TCB *TaskHandle_t;
 /*********************** Function Prototypes *****************/
 
-int taskInit(void (*func)(void *), int priority, void *const pvParameters, uint32_t stackSize);
+TaskHandle_t taskInit(void (*func)(void *), int priority, void *const pvParameters, uint32_t stackSize);
 void taskDelay(uint32_t ticks);
 void taskYield(void);
 void taskWait(Event_t *event, uint32_t timeout);
 TCB_t *taskWake(Event_t *event);
 void taskChangePriority(TCB_t *task, uint32_t newPriority);
 void taskWakeFromEventGroup(TCB_t *task, EventNode_t *node);
+void taskNotifyGive(TaskHandle_t task);
+void taskNotifyWait(uint32_t ClearCountOnExit, uint32_t timeout);
 /***************************************************************/
 
 #endif /* __TASK_H */

@@ -58,10 +58,12 @@ Semaphore_t *semKey;        // 二值信号量
 Semaphore_t *TimerTaskNotifySem; // 定时器任务通知信号量
 Mutex_t *mutexKey;              // 互斥锁
 EventGroup_t *eventGroupKey; // 事件组
+TaskHandle_t timerTask; // 定时器任务句柄
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
-extern void prvPortStartFirstTask(void);
+extern void
+prvPortStartFirstTask(void);
 void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
 void hardfault_handler_c(uint32_t *stack)

@@ -14,6 +14,7 @@
 List_t timerList; // 定时器链表
 extern uint32_t currentTicks; // 系统滴答数
 extern Semaphore_t *TimerTaskNotifySem; // 定时器任务通知信号量
+extern TaskHandle_t timerTask; // 定时器任务句柄
 /***************************************************************/
 
 /*********************** Static Variables ***********************/
@@ -46,7 +47,7 @@ void TimerTaskInit(void)
 {
     // 初始化定时器链表
     vListInit(&timerList);
-    taskInit(TimerTask, 11, NULL, 512); // 创建定时器任务，优先级最低，栈大小512字节
+    timerTask = taskInit(TimerTask, 11, NULL, 512); // 创建定时器任务，优先级最低，栈大小512字节
 }
 
 void Timer_Start(Timer_t *timer)
@@ -55,7 +56,6 @@ void Timer_Start(Timer_t *timer)
     {
         // 将定时器插入到定时器链表中，按照超时时间排序
         vListInsert(&timerList, &timer->listItem, 1);
-        printf("Timer started with expire time: %lu ms\r\n", timer->expireTime - currentTicks);
     }
 }
 
@@ -74,8 +74,7 @@ void TimerTask()
     {
         // 定时器任务，检查定时器链表中的定时器是否超时，并执行回调函数
         ListItem_t *currentItem = timerList.end.next;
-        semaphoreBinaryWait(TimerTaskNotifySem);// 等待定时器任务通知信号量
-        printf("Timer task running at tick: %lu\r\n", currentTicks);
+        taskNotifyWait(1,1000000); // 等待定时器任务通知信号量
         while (currentItem != &timerList.end)
         {
             ListItem_t *next = currentItem->next; // 先保存下一个节点，避免当前节点被删除后无法访问
