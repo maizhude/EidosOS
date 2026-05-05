@@ -4,6 +4,7 @@
 #include "main.h"
 #include "list.h"
 #include "sync.h"
+#include "timer.h"
 
 extern Semaphore_t *semKey;        // 二值信号量
 extern Mutex_t *mutexKey;              // 互斥锁
@@ -73,4 +74,18 @@ void task_idle()
         // 空闲任务可以进入低功耗模式
         __WFI(); // 等待中断
     }
+}
+
+void timer_callback(void *arg)
+{
+    // 定时器回调函数，执行定时任务
+    HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_0); // 切换LED状态
+}
+
+void timer_init()
+{
+    printf("Timer initialized.\r\n");
+    Timer_t *timer = Timer_Init(timer_callback, NULL, 1000, 1); // 创建一个1秒自动重载的定时器
+    printf("Timer created.\r\n");
+    Timer_Start(timer); // 启动定时器
 }

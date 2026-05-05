@@ -29,6 +29,7 @@
 #include "list.h"
 #include "test.h"
 #include "sync.h"
+#include "timer.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -51,14 +52,16 @@
 /* USER CODE BEGIN PV */
 extern TCB_t * currentTCB; // 当前正在运行的任务
 uint32_t currentTicks = 0; // 系统滴答数
-extern vList delayList;    // 任务延迟链表
-extern vList readyList;    // 就绪链表
+extern List_t delayList;    // 任务延迟链表
+extern List_t readyList;    // 就绪链表
 Semaphore_t *semKey;        // 二值信号量
+Semaphore_t *TimerTaskNotifySem; // 定时器任务通知信号量
 Mutex_t *mutexKey;              // 互斥锁
 EventGroup_t *eventGroupKey; // 事件组
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
+extern void prvPortStartFirstTask(void);
 void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
 void hardfault_handler_c(uint32_t *stack)
@@ -136,13 +139,16 @@ int main(void)
   vListInit(&delayList);
   vListInit(&readyList);
   semKey = semaphoreBinaryInit(); // 初始化二值信号量
+  TimerTaskNotifySem = semaphoreBinaryInit(); // 初始化定时器任务通知信号量
   mutexKey = mutexInit(); // 初始化互斥锁
   eventGroupKey = eventGroupInit(); // 初始化事件组
+  TimerTaskInit(); // 初始化定时器任务
   // 创建任务
   taskInit(task_func1, 2, NULL, STACK_SIZE);
   taskInit(task_func2, 3, NULL, STACK_SIZE);
   taskInit(task_func3, 4, NULL, STACK_SIZE);
   taskInit(task_idle, 1, NULL, STACK_SIZE);
+  timer_init();
   HAL_Delay(100);
   PrintVersion();                                 // 打印版本信息
   currentTCB = readyList.end.next->next->pvOwner; // 设置当前任务为第一个就绪的任务

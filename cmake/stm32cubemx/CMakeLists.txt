@@ -31,6 +31,8 @@ set(MX_Application_Src
     ${CMAKE_CURRENT_SOURCE_DIR}/../../RTOS/Src/list.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../RTOS/Src/queue.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../RTOS/Src/sync.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../RTOS/Src/timer.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../RTOS/Src/port.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/test.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/version.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../startup_stm32f103xe.s

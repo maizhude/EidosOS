@@ -13,8 +13,8 @@
 
 /*********************** Global Variables ***********************/
 
-vList delayList; // 任务延迟链表
-vList readyList; // 就绪链表
+List_t delayList; // 任务延迟链表
+List_t readyList; // 就绪链表
 
 /***************************************************************/
 
@@ -38,7 +38,7 @@ void vListItemInit(ListItem_t *node)
 }
 
 // 初始化链表
-void vListInit(vList *list)
+void vListInit(List_t *list)
 {
     list->itemNumber = 0;
     list->index = NULL;
@@ -48,7 +48,7 @@ void vListInit(vList *list)
 }
 
 // 将节点插入链表尾部
-void vListInsertEnd(vList *list, ListItem_t *node)
+void vListInsertEnd(List_t *list, ListItem_t *node)
 {
     node->prev = list->end.prev; // 新节点的前驱是当前尾节点
     node->next = &list->end;     // 新节点的后继是哨兵节点
@@ -59,7 +59,7 @@ void vListInsertEnd(vList *list, ListItem_t *node)
 }
 
 // 将节点按照顺序插入链表，根据传入的顺序规则判断从大到小还是从小到大
-void vListInsert(vList *list, ListItem_t *node, int ascending)
+void vListInsert(List_t *list, ListItem_t *node, int ascending)
 {
     ListItem_t *current = list->end.next; // 从头节点开始遍历
     if (ascending)
@@ -97,7 +97,7 @@ void vListRemove(ListItem_t *node)
 }
 
 // 获取链表头部节点
-ListItem_t *vListGetHead(vList *list)
+ListItem_t *vListGetHead(List_t *list)
 {
     if (list->itemNumber == 0)
     {

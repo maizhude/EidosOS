@@ -31,8 +31,8 @@ whx            2026.3.11    V1.0.0          create file
 
 TCB_t *currentTCB = NULL;     // 当前正在运行的任务
 extern uint32_t currentTicks; // 系统滴答数
-extern vList delayList;       // 任务延迟链表
-extern vList readyList;       // 就绪链表
+extern List_t delayList;       // 任务延迟链表
+extern List_t readyList;       // 就绪链表
 
 /***************************************************************/
 
@@ -187,37 +187,13 @@ void taskYield(void)
     SCB->ICSR |= SCB_ICSR_PENDSVSET_Msk; // 触发 PendSV
 }
 
-/**
- * @brief 启动第一个任务
- */
-void prvPortStartFirstTask( void )
-{
-	/* Start the first task.  This also clears the bit that indicates the FPU is
-	in use in case the FPU was used before the scheduler was started - which
-	would otherwise result in the unnecessary leaving of space in the SVC stack
-	for lazy saving of FPU registers. */
-	__asm volatile(
-					" ldr r0, =0xE000ED08 	\n" /* Use the NVIC offset register to locate the stack. */
-					" ldr r0, [r0] 			\n"
-					" ldr r0, [r0] 			\n"
-					" msr msp, r0			\n" /* Set the msp back to the start of the stack. */
-					" mov r0, #0			\n" /* Clear the bit that indicates the FPU is in use, see comment above. */
-					" msr control, r0		\n"
-					" cpsie i				\n" /* Globally enable interrupts. */
-					" cpsie f				\n"
-					" dsb					\n"
-					" isb					\n"
-					" svc 0					\n" /* System call to start first task. */
-					" nop					\n"
-				);
-}
 
 void taskWait(Event_t *event, uint32_t timeout)
 {
     // 删除当前任务在就绪链表中的状态节点
     vListRemove(&currentTCB->stateListItem);
     // 将当前任务事件节点添加到事件的等待链表中,按照优先级排序
-    vListInsert((vList *)&event->waitingList, &currentTCB->eventNode.eventListItem, 0);
+    vListInsert((List_t *)&event->waitingList, &currentTCB->eventNode.eventListItem, 0);
     // 阻塞当前任务
     currentTCB->state = BLOCKED;
     if (timeout > 0)

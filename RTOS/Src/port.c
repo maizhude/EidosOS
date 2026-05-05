@@ -1,12 +1,17 @@
-
+#include "main.h"
 #include "EidosOSconfig.h"
 #include "task.h"
 #include "list.h"
+#include "timer.h"
+#include "sync.h"
+/*********************** Global Variables ***********************/
 
 extern TCB_t *currentTCB;	  // 当前正在运行的任务
 extern uint32_t currentTicks; // 系统滴答数
-extern vList delayList;		  // 任务延迟链表
-extern vList readyList;		  // 就绪链表
+extern List_t delayList;		  // 任务延迟链表
+extern List_t readyList;		  // 就绪链表
+extern List_t timerList;		  // 定时器链表
+extern Semaphore_t *TimerTaskNotifySem; // 定时器任务通知信号量
 /*-----------------------------------------------------------*/
 
 void prvPortStartFirstTask( void )
@@ -58,6 +63,15 @@ void vPortSysTickHandler(void)
 	if (currentTicks == 0xFFFFFFFF)
 	{
 		currentTicks = 0;
+	}
+	if (timerList.end.next != &timerList.end) // 如果系统滴答数达到了定时器链表中第一个定时器的超时时间
+	{	
+		Timer_t *timer = (Timer_t *)timerList.end.next->pvOwner;
+		if (currentTicks >= timer->expireTime)
+		{
+			// 通知定时器任务处理超时定时器
+			semaphoreBinarySignal(TimerTaskNotifySem);
+		}
 	}
 	if (currentTCB != NULL)
 	{

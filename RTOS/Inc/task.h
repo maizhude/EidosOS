@@ -37,13 +37,12 @@ typedef struct TCB
 
 typedef struct event
 {
-    vList waitingList;
+    List_t waitingList;
 } Event_t;
 
 /*********************** Function Prototypes *****************/
 
 int taskInit(void (*func)(void *), int priority, void *const pvParameters, uint32_t stackSize);
-void prvPortStartFirstTask( void );
 void taskDelay(uint32_t ticks);
 void taskYield(void);
 void taskWait(Event_t *event, uint32_t timeout);
